@@ -22,7 +22,7 @@
   "require": {
     "php": ">=7.3.0",
     "ext-json": "*",
-    "mehr-it/php-decimals": "dev-master"
+    "mehr-it/php-decimals": "^2.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^7.4"
