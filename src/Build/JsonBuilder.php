@@ -39,7 +39,7 @@
 					throw new RuntimeException("Failed to open \"{$target}\" for writing.");
 			}
 			else if ($target === null) {
-				$target = fopen('php://memory', 'w+');
+				$target = fopen('php://temp', 'w+');
 				$this->usingMemory = true;
 			}
 
