@@ -354,7 +354,7 @@
 		}
 
 		/**
-		 * Pops the the last path segment off
+		 * Pops the last path segment off
 		 * @return string|null The popped segment
 		 */
 		protected function popPath(): ?string {
