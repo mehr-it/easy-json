@@ -13,6 +13,16 @@
 	class JsonParserTest extends TestCase
 	{
 
+		public function testValue_string() {
+
+			$out = null;
+
+			JsonParser::fromString("\"asd \\\"string\\\"\"")
+				->value([], $out)
+				->parse();
+
+			$this->assertSame("asd \"string\"", $out);
+		}
 
 		public function testValue_string_rootLevel() {
 
@@ -729,6 +739,17 @@
 				->parse();
 
 			$this->assertSame([1, 2, 3], $out);
+		}
+
+		public function testValue_object_withZeroValue() {
+
+			$out = null;
+
+			JsonParser::fromString("{\"a\":0}")
+				->value([], $out)
+				->parse();
+
+			$this->assertSame(['a' => 0], $out);
 		}
 
 		public function testValue_object_rootLevel() {

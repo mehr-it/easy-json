@@ -58,9 +58,9 @@
 
 		protected $stateStack = [];
 
-		
+
 		protected $anyOutput = false;
-		
+
 		protected $depth = 0;
 
 		protected $path = [];
@@ -123,12 +123,12 @@
 		 * @return JsonParser
 		 */
 		public function setBufferMaxSize(int $bufferMaxSize): JsonParser {
-			
+
 			if ($bufferMaxSize < self::CHUNK_SIZE)
 				throw new InvalidArgumentException('Maximum buffer size must be at least ' . self::CHUNK_SIZE);
-			
+
 			$this->bufferMaxSize = $bufferMaxSize;
-			
+
 			return $this;
 		}
 
@@ -147,49 +147,49 @@
 		 */
 		public function setNumbersAsString(bool $numbersAsString): JsonParser {
 			$this->numbersAsString = $numbersAsString;
-			
+
 			return $this;
 		}
-		
-		
+
+
 		/**
 		 * Parses the rest of the document
 		 * @return $this
 		 */
 		public function parse(): JsonParser {
-		
+
 
 			if (empty($this->stateStack))
 				$this->stateStack[] = ['state' => self::STATE_ROOT];
 
-			
+
 			while (true) {
 				if (!$this->parseElement())
 					break;
 			}
-			
+
 			return $this;
 		}
 
 		/**
-		 * Consumes any data until the current element has been parsed completely. 
+		 * Consumes any data until the current element has been parsed completely.
 		 * @return $this
 		 */
 		public function consume(): JsonParser {
 			if (empty($this->stateStack))
 				$this->stateStack[] = ['state' => self::STATE_ROOT];
-			
+
 			$startDepth = $this->depth;
 
 			while (true) {
-				
-				if (!$this->parseElement()) 
+
+				if (!$this->parseElement())
 					break;
 
 				if ($this->depth < $startDepth)
 					break;
 			}
-			
+
 			return $this;
 		}
 
@@ -277,7 +277,7 @@
 		 * @return $this
 		 */
 		public function value($path, &$out, bool $associative = true, string $pathSeparator = '.'): JsonParser {
-			
+
 			$this->addCallback(new ValueCallback(
 				$this->makeAbsPath($path, $pathSeparator),
 				function ($value) use (&$out) {
@@ -317,7 +317,7 @@
 			$level = ++$this->depth;
 
 			$newCallbacks = [];
-			$i            = 0; 
+			$i            = 0;
 			foreach (end($this->callbacks) as $currCallback) {
 
 				if ($currCallback->captureNested()) {
@@ -327,20 +327,18 @@
 				}
 				else {
 					$currPath = $currCallback->path();
-					
-					
 
 					if ((string)($currPath[$level - 1] ?? '') === $segment) {
 						// keep callback, when path matches so far
 
 						if (count($currPath) > $level) {
 							// the callback matches a deeper path => we indicate that by a negative key
-							
+
 							$newCallbacks[-(++$i)] = $currCallback;
 						}
 						else {
 							// the callback is matching the path exactly
-							
+
 							$newCallbacks[++$i] = $currCallback;
 						}
 
@@ -362,10 +360,10 @@
 			--$this->depth;
 
 			array_pop($this->callbacks);
-			
-			
+
+
 			return array_pop($this->path);
-			
+
 		}
 
 
@@ -375,7 +373,6 @@
 		 * @param mixed $value The value
 		 */
 		protected function out(int $element, $value = null) {
-
 
 			$this->anyOutput = true;
 
@@ -403,238 +400,230 @@
 			[$ws, $next] = $this->readOnly(self::WHITESPACE_TOKENS, true);
 
 			$stateData = &$this->stateStack[array_key_last($this->stateStack)];
-			$state = $stateData['state'];
+			$state     = $stateData['state'];
 
 			// check for any additional content after root and throw error
 			if ($state === self::STATE_ROOT && $this->anyOutput) {
 				if ($next !== false && $next !== null)
 					$this->throwSyntaxException('Unexpected content after JSON root element', $ws . $next);
 			}
-			
-
-			switch ($next) {
-
-				case '{':
-					// start of object
-
-					switch ($state) {
-						case self::STATE_OBJECT_KEY:
-							$this->throwSyntaxException('Expected object key', $next);
-							break;
-
-						case self::STATE_OBJECT_DELIMITER:
-							$this->throwSyntaxException('Expected ":"', $next);
-							break;
-
-						/** @noinspection PhpMissingBreakStatementInspection */
-						case self::STATE_ARRAY_ITEM:
-							// remove previous array index from path (if any) and add current
-							if ($stateData['index'] > -1)
-								$this->popPath();
-							$this->pushPath(++$stateData['index']);
-							
-							
-						default:
-							$stateData['expectNext'] = false;
-
-							$this->stateStack[] = ['state' => self::STATE_OBJECT_KEY];
-							
-							$this->out(self::ELEMENT_OBJECT_START);
-					}
-
-					break;
-
-				case '[':
-					
-					
-					// start of array
-					switch ($state) {
-						case self::STATE_OBJECT_KEY:
-							$this->throwSyntaxException('Expected object key', $next);
-							break;
-
-						case self::STATE_OBJECT_DELIMITER:
-							$this->throwSyntaxException('Expected ":"', $next);
-							break;
-
-						/** @noinspection PhpMissingBreakStatementInspection */ 
-						case self::STATE_ARRAY_ITEM:
-							// remove previous array index from path (if any) and add current
-							if ($stateData['index'] > -1)
-								$this->popPath();
-							$this->pushPath(++$stateData['index']);
-
-						default:
-							$stateData['expectNext'] = false;
-							
-							$this->stateStack[] = ['state' => self::STATE_ARRAY_ITEM, 'index' => -1];
-							
-							$this->out(self::ELEMENT_ARRAY_START);
-							
-					}
 
 
-					break;
+			if ($next === '{') {
+				// start of object
 
-				case ':':
+				switch ($state) {
+					case self::STATE_OBJECT_KEY:
+						$this->throwSyntaxException('Expected object key', $next);
+						break;
 
-					// a colon is only expected after an object key
-					switch ($state) {
-						case self::STATE_OBJECT_DELIMITER:
-							array_pop($this->stateStack);
-							$this->stateStack[] = ['state' => self::STATE_OBJECT_VALUE, 'expectNext' => true];
-							break;
+					case self::STATE_OBJECT_DELIMITER:
+						$this->throwSyntaxException('Expected ":"', $next);
+						break;
 
-						default:
+					/** @noinspection PhpMissingBreakStatementInspection */
+					case self::STATE_ARRAY_ITEM:
+						// remove previous array index from path (if any) and add current
+						if ($stateData['index'] > -1)
+							$this->popPath();
+						$this->pushPath(++$stateData['index']);
 
-							$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
-					}
+
+					default:
+						$stateData['expectNext'] = false;
+
+						$this->stateStack[] = ['state' => self::STATE_OBJECT_KEY];
+
+						$this->out(self::ELEMENT_OBJECT_START);
+				}
+
+			}
+			elseif ($next === '[') {
+
+				// start of array
+				switch ($state) {
+					case self::STATE_OBJECT_KEY:
+						$this->throwSyntaxException('Expected object key', $next);
+						break;
+
+					case self::STATE_OBJECT_DELIMITER:
+						$this->throwSyntaxException('Expected ":"', $next);
+						break;
+
+					/** @noinspection PhpMissingBreakStatementInspection */
+					case self::STATE_ARRAY_ITEM:
+						// remove previous array index from path (if any) and add current
+						if ($stateData['index'] > -1)
+							$this->popPath();
+						$this->pushPath(++$stateData['index']);
+
+					default:
+						$stateData['expectNext'] = false;
+
+						$this->stateStack[] = ['state' => self::STATE_ARRAY_ITEM, 'index' => -1];
+
+						$this->out(self::ELEMENT_ARRAY_START);
+
+				}
 
 
-					break;
+			}
+			else if ($next === ':') {
 
-				case ',':
+				// a colon is only expected after an object key
+				switch ($state) {
+					case self::STATE_OBJECT_DELIMITER:
+						array_pop($this->stateStack);
+						$this->stateStack[] = ['state' => self::STATE_OBJECT_VALUE, 'expectNext' => true];
+						break;
 
-					// a separator is expected after object value or array item
-					switch ($state) {
-						case self::STATE_OBJECT_VALUE:
+					default:
+
+						$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
+				}
+
+
+			}
+			elseif ($next === ',') {
+
+				// a separator is expected after object value or array item
+				switch ($state) {
+					case self::STATE_OBJECT_VALUE:
+						$this->popPath();
+
+						// expect a new object key
+						array_pop($this->stateStack);
+						$this->stateStack[] = ['state' => self::STATE_OBJECT_KEY, 'expectNext' => true];
+						break;
+
+					case self::STATE_ARRAY_ITEM:
+						if ($stateData['expectNext'] ?? null) {
+							$this->throwSyntaxException("Expected next item, but none exists.", $next);
+						}
+
+						// expect next element
+						$stateData['expectNext'] = true;
+						break;
+
+					default:
+						$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
+				}
+			}
+			elseif ($next === '}') {
+				switch ($state) {
+
+					case self::STATE_OBJECT_VALUE:
+
+						if (!($stateData['expectNext'] ?? null)) {
 							$this->popPath();
 
-							// expect a new object key
+							// pop state
 							array_pop($this->stateStack);
-							$this->stateStack[] = ['state' => self::STATE_OBJECT_KEY, 'expectNext' => true];
+							//var_dump($this->path);
+							//var_dump($this->stateStack);
+
+							// array end
+							$this->out(self::ELEMENT_OBJECT_END);
 							break;
-
-						case self::STATE_ARRAY_ITEM:
-							if ($stateData['expectNext'] ?? null) {
-								$this->throwSyntaxException("Expected next item, but none exists.", $next);
-							}
-
-							// expect next element
-							$stateData['expectNext'] = true;
-							break;
-
-						default:
+						}
+						else {
 							$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
-					}
-					break;
+						}
+						break;
 
-				case '}':
-					switch ($state) {
-						
-						case self::STATE_OBJECT_VALUE:
-								
-							if (!($stateData['expectNext'] ?? null)) {
-								$this->popPath();
+					case self::STATE_OBJECT_KEY:
+						// end of array => stop parsing
+						if (!($stateData['expectNext'] ?? null)) {
 
-								// pop state
-								array_pop($this->stateStack);
-
-								// array end
-								$this->out(self::ELEMENT_OBJECT_END);
-								break;
-							}
-							else {
-								$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
-							}
-							break;
-							
-						case self::STATE_OBJECT_KEY:
-							// end of array => stop parsing
-							if (!($stateData['expectNext'] ?? null)) {
-
-								// pop state
-								array_pop($this->stateStack);
-
-								// array end
-								$this->out(self::ELEMENT_OBJECT_END);
-								break;
-							}
-							else {
-								$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
-							}
-							break;
-
-						default:
-							$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
-					}
-					break;
-
-				case ']':
-
-					switch ($state) {
-						/** @noinspection PhpMissingBreakStatementInspection */
-						case self::STATE_ARRAY_ITEM:
-							
-							// end of array => stop parsing
-							if (!($stateData['expectNext'] ?? null)) {
-								// remove previous array index from path (if any) 
-								if ($stateData['index'] > -1)
-									$this->popPath();
-
-								// pop state
-								array_pop($this->stateStack);
-
-								// array end
-								$this->out(self::ELEMENT_ARRAY_END);
-								break;
-							}
-
-						default:
-							$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
-					}
-
-					break;
-
-				case false:
-					// end of file
-					
-					// are we at root level again => otherwise this is unexpected
-					if ($state != self::STATE_ROOT || !$this->anyOutput)
-						$this->throwUnexpectedEndOfFileException();
-					
-					return false;
-
-				default:
-					$stateData['expectNext'] = false;
-
-					switch ($state) {
-						case self::STATE_OBJECT_KEY:
-							if ($next !== '"')
-								$this->throwSyntaxException('Expected object key', $next);
-
-							// parse key
-							$currKey = $this->parseString();
-
-
-							$this->out(self::ELEMENT_STRING, $currKey);
-							$this->pushPath($currKey);
-
-							// expect colon
+							// pop state
 							array_pop($this->stateStack);
-							$this->stateStack[] = ['state' => self::STATE_OBJECT_DELIMITER];
 
-
+							// array end
+							$this->out(self::ELEMENT_OBJECT_END);
 							break;
+						}
+						else {
+							$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
+						}
+						break;
 
-						case self::STATE_OBJECT_DELIMITER:
-							$this->throwSyntaxException('Expected ":"', $next);
-							break;
+					default:
+						$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
+				}
+			}
+			elseif ($next === ']') {
 
-						/** @noinspection PhpMissingBreakStatementInspection */
-						case self::STATE_ARRAY_ITEM:
-							// remove previous array index from path (if any) and add current
+				switch ($state) {
+					/** @noinspection PhpMissingBreakStatementInspection */
+					case self::STATE_ARRAY_ITEM:
+
+						// end of array => stop parsing
+						if (!($stateData['expectNext'] ?? null)) {
+							// remove previous array index from path (if any) 
 							if ($stateData['index'] > -1)
 								$this->popPath();
 
-							$this->pushPath(++$stateData['index']);
-							
+							// pop state
+							array_pop($this->stateStack);
 
-						default:
-							$this->parseScalar($next);
-					}
+							// array end
+							$this->out(self::ELEMENT_ARRAY_END);
+							break;
+						}
+
+					default:
+						$this->throwSyntaxException("Unexpected \"{$next}\"", $next);
+				}
+
+			}
+			else if ($next === false) {
+				// end of file
+
+				// are we at root level again => otherwise this is unexpected
+				if ($state != self::STATE_ROOT || !$this->anyOutput)
+					$this->throwUnexpectedEndOfFileException();
+
+				return false;
+
+			}
+			else {
+				$stateData['expectNext'] = false;
+
+				switch ($state) {
+					case self::STATE_OBJECT_KEY:
+						if ($next !== '"')
+							$this->throwSyntaxException('Expected object key', $next);
+
+						// parse key
+						$currKey = $this->parseString();
 
 
+						$this->out(self::ELEMENT_STRING, $currKey);
+						$this->pushPath($currKey);
+
+						// expect colon
+						array_pop($this->stateStack);
+						$this->stateStack[] = ['state' => self::STATE_OBJECT_DELIMITER];
+
+
+						break;
+
+					case self::STATE_OBJECT_DELIMITER:
+						$this->throwSyntaxException('Expected ":"', $next);
+						break;
+
+					/** @noinspection PhpMissingBreakStatementInspection */
+					case self::STATE_ARRAY_ITEM:
+						// remove previous array index from path (if any) and add current
+						if ($stateData['index'] > -1)
+							$this->popPath();
+
+						$this->pushPath(++$stateData['index']);
+
+
+					default:
+						$this->parseScalar($next);
+				}
 			}
 
 			// indicate that linebreaks of previous buffers are not needed anymore
@@ -651,61 +640,51 @@
 		protected function parseScalar(string $firstChar): void {
 
 
-			switch ($firstChar) {
+			if ($firstChar === '"') {
+				// start of string
+				$this->out(self::ELEMENT_STRING, $this->parseString());
+			}
+			else {
+				// start of number, boolean or null
 
-				case '"':
-					// start of string
-					$this->out(self::ELEMENT_STRING, $this->parseString());
-					break;
+				[$token,] = $this->readOnly('0123456789eE+-.trufalsnll', false);
 
-				default:
-					// start of number, boolean or null
+				// the first char belongs to the value
+				$token = "{$firstChar}{$token}";
 
-					[$token,] = $this->readOnly('0123456789eE+-.trufalsnll', false);
+				if ($token === 'true') {
+					$this->out(self::ELEMENT_BOOLEAN, true);
+				}
+				elseif ($token === 'false') {
+					$this->out(self::ELEMENT_BOOLEAN, false);
+				}
+				elseif ($token === 'null') {
+					$this->out(self::ELEMENT_NULL, null);
+				}
+				else {
 
-					// the first char belongs to the value
-					$token = "{$firstChar}{$token}";
+					if ($this->numbersAsString) {
 
-					switch ($token) {
-						case 'true':
-							$this->out(self::ELEMENT_BOOLEAN, true);
-							break;
-
-						case 'false':
-							$this->out(self::ELEMENT_BOOLEAN, false);
-							break;
-
-						case 'null':
-							$this->out(self::ELEMENT_NULL, null);
-							break;
-
-
-						default:
-
-							if ($this->numbersAsString) {
-
-								// The number should be returned as string. Anyhow we reduce the exponent. 								
-								try {
-									$number = Numbers::reduceExponent($token);
-								}
-								catch (InvalidArgumentException $ex) {
-									$this->throwSyntaxException('Invalid number', $token);
-								}
-							}
-							else {
-
-								// use JSON decode to parse the number to a native type
-								$number = @json_decode($token);
-								if (json_last_error() !== JSON_ERROR_NONE) {
-									$this->throwSyntaxException('Invalid number', $token);
-								}
-							}
-
-							$this->out(self::ELEMENT_NUMBER, $number);
-
-							break;
-
+						// The number should be returned as string. Anyhow we reduce the exponent. 								
+						try {
+							$number = Numbers::reduceExponent($token);
+						}
+						catch (InvalidArgumentException $ex) {
+							$this->throwSyntaxException('Invalid number', $token);
+						}
 					}
+					else {
+
+						// use JSON decode to parse the number to a native type
+						$number = @json_decode($token);
+						if (json_last_error() !== JSON_ERROR_NONE) {
+							$this->throwSyntaxException('Invalid number', $token);
+						}
+					}
+
+					$this->out(self::ELEMENT_NUMBER, $number);
+
+				}
 			}
 		}
 
@@ -726,25 +705,22 @@
 					$escaped = false;
 
 				$str .= $chunk;
-				switch ($token) {
-
-					case '"':
-						if ($escaped)
-							$str .= "\"";
-						else
-							break 2;
-
+				if ($token === '"') {
+					if ($escaped) {
+						$str     .= "\"";
+						$escaped = false;
+					}
+					else {
 						break;
+					}
 
-					case '\\':
-						$str .= '\\';
-
-						if (!$escaped)
-							$escaped = true;
-						break;
-
-					case false:
-						$this->throwUnexpectedEndOfFileException();
+				}
+				elseif ($token === '\\') {
+					$str     .= '\\';
+					$escaped = !$escaped;
+				}
+				else if ($token === false) {
+					$this->throwUnexpectedEndOfFileException();
 				}
 			}
 
